@@ -21,7 +21,6 @@ export default function VideoPlayer({ src, poster, autoPlay = false }: VideoPlay
     // Dynamically import Plyr and its CSS (client-side only)
     const loadPlyr = async () => {
       const Plyr = (await import('plyr')).default;
-      await import('plyr/dist/plyr.css');
       return Plyr;
     };
 

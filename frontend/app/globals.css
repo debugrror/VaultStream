@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import 'plyr/dist/plyr.css';
 
 /* ============================================
    VaultStream Design System
