@@ -85,9 +85,9 @@ export default function DashboardPage() {
             {videos.map((video) => (
               <Card key={video.videoId} className="overflow-hidden">
                 <div className="relative aspect-video bg-gray-200">
-                  {video.thumbnailPath ? (
+                  {`${process.env.NEXT_PUBLIC_API_BASE_URL}${video.thumbnailPath}` ? (
                     <img
-                      src={`/api/videos/${video.videoId}/thumbnail`} // Proxy handle this? No, backend doesn't serve thumbnail directly yet?
+                      src={`${process.env.NEXT_PUBLIC_API_BASE_URL}/${video.thumbnailPath}`} // Proxy handle this? No, backend doesn't serve thumbnail directly yet?
                       // Wait, we need a way to serve thumbnails. Backend Phase 3 said "Extracts a thumbnail image", but didn't explicitly mention a thumbnail endpoint.
                       // Actually, if it's local storage, we might need a route to serve it.
                       // Or just use a placeholder for now.

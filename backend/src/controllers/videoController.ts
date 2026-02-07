@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
+import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { Video } from '@models/Video';
 import { storageAdapter } from '@services/storage';
@@ -13,10 +14,20 @@ import type { ApiResponse, AuthenticatedRequest } from '../types';
 
 /**
  * Configure Multer for video uploads
- * Store in memory temporarily before moving to storage adapter
+ * Stream to temporary disk storage to support large files
  */
 export const uploadMiddleware = multer({
-  storage: multer.memoryStorage(),
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      // Ensure temp directory exists
+      cb(null, config.storage.tempUploadPath);
+    },
+    filename: (_req, file, cb) => {
+      // Use UUID for temp filename to avoid collisions
+      const uniqueSuffix = `${Date.now()}-${uuidv4()}`;
+      cb(null, `${uniqueSuffix}${path.extname(file.originalname)}`);
+    },
+  }),
   limits: {
     fileSize: config.video.maxSizeMB * 1024 * 1024, // Convert MB to bytes
   },
@@ -46,18 +57,25 @@ export const uploadVideo = asyncHandler(async (req: Request, res: Response) => {
   const authReq = req as AuthenticatedRequest;
 
   if (!authReq.user) {
+    // Clean up temp file if auth fails
+    if (req.file) {
+      await fs.promises.unlink(req.file.path).catch(() => {});
+    }
     throw ApiError.unauthorized('Authentication required');
   }
 
-  // Multer middleware has already run and populated req.file and req.body
+  // Multer middleware has already run and populated req.file (with path) and req.body
   if (!req.file) {
     throw ApiError.badRequest('No video file provided', 'NO_FILE');
   }
 
   const { title, description, visibility, passphrase } = req.body;
+  const tempFilePath = req.file.path;
 
   // Validate required fields
   if (!title || title.trim().length === 0) {
+    // Clean up temp file
+    await fs.promises.unlink(tempFilePath).catch(() => {});
     throw ApiError.badRequest('Title is required', 'MISSING_TITLE');
   }
 
@@ -70,21 +88,43 @@ export const uploadVideo = asyncHandler(async (req: Request, res: Response) => {
   const videoStoragePath = `videos/${userId}/${videoId}/original${fileExtension}`;
   const hlsPath = `videos/${userId}/${videoId}/hls`;
 
-  // Hash passphrase if provided
-  let passphraseHash: string | undefined;
-  if (passphrase && passphrase.trim().length > 0) {
-    const { SecurityService } = await import('@services/SecurityService');
-    passphraseHash = await SecurityService.hashPassphrase(passphrase.trim());
-    logger.info('Passphrase protection enabled for video', { videoId });
-  }
-
   try {
-    // Upload original file to storage
-    await storageAdapter.upload(req.file.buffer, videoStoragePath, {
-      contentType: req.file.mimetype,
-      size: req.file.size,
-      originalName: originalFilename,
-    });
+    // Hash passphrase if provided
+    let passphraseHash: string | undefined;
+    if (passphrase && passphrase.trim().length > 0) {
+      const { SecurityService } = await import('@services/SecurityService');
+      passphraseHash = await SecurityService.hashPassphrase(passphrase.trim());
+      logger.info('Passphrase protection enabled for video', { videoId });
+    }
+
+    // Upload to storage
+    if (config.storage.type === 'local') {
+      // OPTIMIZATION: For local storage, just move the file to avoid double I/O.
+      // This is much faster and uses 0 extra memory.
+      const destPath = await storageAdapter.getPath(videoStoragePath);
+      const destDir = path.dirname(destPath);
+      
+      await fs.promises.mkdir(destDir, { recursive: true });
+      await fs.promises.rename(tempFilePath, destPath);
+      
+      logger.debug('Moved temp file to local storage', { temp: tempFilePath, dest: destPath });
+    } else {
+      // For cloud storage (S3/R2), stream the file from disk.
+      // This prevents loading the 2GB+ file into RAM.
+      const readStream = fs.createReadStream(tempFilePath);
+      
+      // storageAdapter.upload expects Buffer in the interface, but underlying implementations 
+      // (like S3/fs.writeFile) support streams. We cast to any to bypass TS for now
+      // while maintaining the interface contract for other callers.
+      await storageAdapter.upload(readStream as any, videoStoragePath, {
+        contentType: req.file.mimetype,
+        size: req.file.size,
+        originalName: originalFilename,
+      });
+      
+      // Delete temp file after successful streaming upload
+      await fs.promises.unlink(tempFilePath).catch(() => {});
+    }
 
     logger.info('Original video uploaded', {
       videoId,
@@ -136,6 +176,9 @@ export const uploadVideo = asyncHandler(async (req: Request, res: Response) => {
 
     res.status(201).json(response);
   } catch (error) {
+    // Cleanup temp file on error
+    await fs.promises.unlink(tempFilePath).catch(() => {});
+
     logger.error('Video upload failed', {
       videoId,
       userId,

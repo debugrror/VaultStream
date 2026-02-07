@@ -25,6 +25,7 @@ export interface Config {
   storage: {
     type: StorageType;
     localPath: string;
+    tempUploadPath: string;
     s3?: {
       accessKeyId: string;
       secretAccessKey: string;
@@ -99,11 +100,12 @@ function buildConfig(): Config {
     storage: {
       type: storageType,
       localPath: path.resolve(getEnvVar('LOCAL_STORAGE_PATH', './uploads')),
+      tempUploadPath: path.resolve(getEnvVar('TEMP_UPLOAD_PATH', '/tmp/vaultstream-uploads')),
     },
     video: {
       hlsSegmentDuration: parseInt(getEnvVar('HLS_SEGMENT_DURATION', '4'), 10),
       allowedFormats: getEnvVar('VIDEO_ALLOWED_FORMATS', 'mp4,mov,avi,mkv,webm').split(','),
-      maxSizeMB: parseInt(getEnvVar('MAX_VIDEO_SIZE_MB', '500'), 10),
+      maxSizeMB: parseInt(getEnvVar('MAX_VIDEO_SIZE_MB', '2048'), 10),
     },
     security: {
       signedUrlExpiry: parseInt(getEnvVar('SIGNED_URL_EXPIRY_SECONDS', '3600'), 10),
