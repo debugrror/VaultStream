@@ -1,0 +1,78 @@
+{
+    "compilerOptions": {
+        /* Language and Environment */
+        "target": "ES2022",
+        "lib": [
+            "ES2022"
+        ],
+        "module": "commonjs",
+        "moduleResolution": "node",
+        /* Type Checking - STRICT MODE */
+        "strict": true,
+        "noImplicitAny": true,
+        "strictNullChecks": true,
+        "strictFunctionTypes": true,
+        "strictBindCallApply": true,
+        "strictPropertyInitialization": true,
+        "noImplicitThis": true,
+        "alwaysStrict": true,
+        "noUnusedLocals": false,
+        "noUnusedParameters": false,
+        "noImplicitReturns": false,
+        "noFallthroughCasesInSwitch": true,
+        "noUncheckedIndexedAccess": false,
+        "noImplicitOverride": true,
+        "noPropertyAccessFromIndexSignature": false,
+        /* Emit */
+        "outDir": "./dist",
+        "rootDir": "./src",
+        "sourceMap": true,
+        "removeComments": true,
+        "declaration": true,
+        "declarationMap": true,
+        /* Interop Constraints */
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "forceConsistentCasingInFileNames": true,
+        "resolveJsonModule": true,
+        /* Skip Lib Check for faster builds */
+        "skipLibCheck": true,
+        /* Path Aliases */
+        "baseUrl": "./src",
+        "paths": {
+            "@config/*": [
+                "config/*"
+            ],
+            "@models/*": [
+                "models/*"
+            ],
+            "@services/*": [
+                "services/*"
+            ],
+            "@middleware/*": [
+                "middleware/*"
+            ],
+            "@utils/*": [
+                "utils/*"
+            ],
+            "@types/*": [
+                "types/*"
+            ],
+            "@routes/*": [
+                "routes/*"
+            ],
+            "@controllers/*": [
+                "controllers/*"
+            ]
+        }
+    },
+    "include": [
+        "src/**/*"
+    ],
+    "exclude": [
+        "node_modules",
+        "dist",
+        "**/*.spec.ts",
+        "**/*.test.ts"
+    ]
+}
