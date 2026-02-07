@@ -49,6 +49,12 @@ router.get('/my-videos', authenticate, videoController.getMyVideos);
 router.post('/:videoId/access', optionalAuthenticate, videoController.requestVideoAccess);
 
 /**
+ * GET /api/videos/:videoId/thumbnail
+ * Serve video thumbnail image
+ */
+router.get('/:videoId/thumbnail', videoController.serveThumbnail);
+
+/**
  * GET /api/videos/:videoId
  * Get video by ID (optional authentication)
  */

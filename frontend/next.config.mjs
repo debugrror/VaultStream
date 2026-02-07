@@ -6,19 +6,27 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: 'http://localhost:5002/api/:path*', // Proxy to Backend
+        destination: 'http://localhost:5001/:path*', // Proxy to Backend
       },
     ];
   },
- images: {
+
+  images: {
     remotePatterns: [
       {
         protocol: 'http',
         hostname: 'localhost',
       },
+      {
+        protocol: 'https',
+        hostname: 'ginifin.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'vault-api.ginifin.com',
+      }
     ],
   },
-
 };
 
 export default nextConfig;

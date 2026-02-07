@@ -8,7 +8,8 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/lib/axios';
 import { formatDistanceToNow } from 'date-fns'; // Need to install date-fns
-import { Play, Lock, Eye, EyeOff, MoreVertical, Plus } from 'lucide-react';
+import { Play, Lock, Eye, EyeOff, MoreVertical, Plus, Trash2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 interface Video {
   videoId: string;
@@ -25,6 +26,7 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchVideos = async () => {
@@ -40,6 +42,23 @@ export default function DashboardPage() {
 
     fetchVideos();
   }, []);
+
+  const handleDeleteVideo = async (videoId: string, title: string) => {
+    if (!window.confirm(`Are you sure you want to delete "${title}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    setDeletingId(videoId);
+    try {
+      await api.delete(`/videos/${videoId}`);
+      setVideos(videos.filter(v => v.videoId !== videoId));
+      toast.success('Video deleted successfully');
+    } catch (error: any) {
+      toast.error(error.response?.data?.error?.message || 'Failed to delete video');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -85,12 +104,9 @@ export default function DashboardPage() {
             {videos.map((video) => (
               <Card key={video.videoId} className="overflow-hidden">
                 <div className="relative aspect-video bg-gray-200">
-                  {`${process.env.NEXT_PUBLIC_API_BASE_URL}${video.thumbnailPath}` ? (
+                  {video.thumbnailPath ? (
                     <img
-                      src={`${process.env.NEXT_PUBLIC_API_BASE_URL}/${video.thumbnailPath}`} // Proxy handle this? No, backend doesn't serve thumbnail directly yet?
-                      // Wait, we need a way to serve thumbnails. Backend Phase 3 said "Extracts a thumbnail image", but didn't explicitly mention a thumbnail endpoint.
-                      // Actually, if it's local storage, we might need a route to serve it.
-                      // Or just use a placeholder for now.
+                      src={`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5001'}/api/videos/${video.videoId}/thumbnail`}
                       alt={video.title}
                       className="h-full w-full object-cover"
                     />
@@ -106,7 +122,7 @@ export default function DashboardPage() {
 
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between">
-                    <div className="space-y-1">
+                    <div className="space-y-1 flex-1">
                       <h3 className="font-semibold text-gray-900 line-clamp-1">
                         <Link href={`/watch/${video.videoId}`} className="hover:underline">
                           {video.title}
@@ -116,8 +132,17 @@ export default function DashboardPage() {
                         {new Date(video.createdAt).toLocaleDateString()}
                       </p>
                     </div>
-                    <button className="text-gray-400 hover:text-gray-600">
-                      <MoreVertical className="h-5 w-5" />
+                    <button
+                      onClick={() => handleDeleteVideo(video.videoId, video.title)}
+                      disabled={deletingId === video.videoId}
+                      className="ml-2 text-gray-400 hover:text-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      title="Delete video"
+                    >
+                      {deletingId === video.videoId ? (
+                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-red-600 border-t-transparent"></div>
+                      ) : (
+                        <Trash2 className="h-5 w-5" />
+                      )}
                     </button>
                   </div>
 

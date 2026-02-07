@@ -10,6 +10,7 @@ import { asyncHandler } from '@middleware/errorHandler';
 import { ApiError } from '@utils/ApiError';
 import { logger } from '@utils/logger';
 import { config } from '@config/env';
+import { moveFileSafe } from '@utils/moveFileSafe';
 import type { ApiResponse, AuthenticatedRequest } from '../types';
 
 /**
@@ -101,11 +102,12 @@ export const uploadVideo = asyncHandler(async (req: Request, res: Response) => {
     if (config.storage.type === 'local') {
       // OPTIMIZATION: For local storage, just move the file to avoid double I/O.
       // This is much faster and uses 0 extra memory.
+      // Uses moveFileSafe to handle cross-device moves (EXDEV errors).
       const destPath = await storageAdapter.getPath(videoStoragePath);
       const destDir = path.dirname(destPath);
       
       await fs.promises.mkdir(destDir, { recursive: true });
-      await fs.promises.rename(tempFilePath, destPath);
+      await moveFileSafe(tempFilePath, destPath);
       
       logger.debug('Moved temp file to local storage', { temp: tempFilePath, dest: destPath });
     } else {
@@ -457,4 +459,47 @@ export const requestVideoAccess = asyncHandler(async (req: Request, res: Respons
   };
 
   res.json(response);
+});
+
+/**
+ * Serve video thumbnail
+ * GET /api/videos/:videoId/thumbnail
+ */
+export const serveThumbnail = asyncHandler(async (req: Request, res: Response) => {
+  const { videoId } = req.params;
+
+  const video = await Video.findOne({ videoId });
+
+  if (!video) {
+    throw ApiError.notFound('Video not found', 'VIDEO_NOT_FOUND');
+  }
+
+  if (!video.thumbnailPath) {
+    throw ApiError.notFound('Thumbnail not found', 'THUMBNAIL_NOT_FOUND');
+  }
+
+  try {
+    // Stream thumbnail from storage
+    const thumbnailStream = await storageAdapter.downloadStream(video.thumbnailPath);
+
+    // Set headers
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin'); // Allow cross-origin loading
+
+    // Handle stream errors
+    thumbnailStream.on('error', (err) => {
+      logger.error('Thumbnail stream error', { videoId, error: err.message });
+      if (!res.headersSent) {
+        res.status(500).json({ success: false, error: { message: 'Failed to load thumbnail' } });
+      }
+      res.end();
+    });
+
+    // Pipe stream to response
+    thumbnailStream.pipe(res);
+  } catch (error) {
+    logger.error('Failed to serve thumbnail', { videoId, error });
+    throw ApiError.internal('Failed to load thumbnail');
+  }
 });
