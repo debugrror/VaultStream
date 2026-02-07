@@ -21,6 +21,10 @@ import healthRoutes from './routes/health';
 function createApp(): Application {
   const app = express();
 
+  // 🔑 TRUST PROXY (MUST BE FIRST)
+  // We are behind Nginx (1 proxy hop)
+  app.set('trust proxy', 1);
+
   // Security middleware
   app.use(helmet());
 
