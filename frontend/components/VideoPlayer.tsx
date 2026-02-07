@@ -39,7 +39,7 @@ export default function VideoPlayer({ src, poster, autoPlay = false }: VideoPlay
           const hls = new Hls({
             enableWorker: true,
             lowLatencyMode: true,
-            backBufferLength: 90,
+            backBufferLength: 30,
           });
 
           hls.loadSource(src);

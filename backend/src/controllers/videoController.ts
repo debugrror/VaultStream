@@ -394,25 +394,29 @@ export const requestVideoAccess = asyncHandler(async (req: Request, res: Respons
     throw ApiError.notFound('Video not found', 'VIDEO_NOT_FOUND');
   }
 
-  // Check visibility permissions
-  if (video.visibility === 'private') {
-    // Private videos require owner authentication
-    if (!authReq.user || authReq.user.userId !== video.userId) {
+  // SECURITY RULE 1: Check if user is the video owner (uploader)
+  // Owners bypass ALL access checks (visibility, passphrase, etc.)
+  const isOwner = authReq.user?.userId === video.userId;
+
+  if (!isOwner) {
+    // SECURITY RULE 2: Non-owners cannot access private videos (EVER)
+    if (video.visibility === 'private') {
       throw ApiError.forbidden('Access denied', 'ACCESS_DENIED');
     }
-  }
 
-  // Check passphrase if video is protected
-  if (video.passphraseHash) {
-    if (!passphrase) {
-      throw ApiError.forbidden('Passphrase required', 'PASSPHRASE_REQUIRED');
-    }
+    // SECURITY RULE 3: Enforce passphrase for non-owners on protected videos
+    // This applies to public/unlisted videos with passphraseHash
+    if (video.passphraseHash) {
+      if (!passphrase) {
+        throw ApiError.forbidden('Passphrase required', 'PASSPHRASE_REQUIRED');
+      }
 
-    const { SecurityService } = await import('@services/SecurityService');
-    const isValid = await SecurityService.verifyPassphrase(passphrase, video.passphraseHash);
+      const { SecurityService } = await import('@services/SecurityService');
+      const isValid = await SecurityService.verifyPassphrase(passphrase, video.passphraseHash);
 
-    if (!isValid) {
-      throw ApiError.forbidden('Invalid passphrase', 'INVALID_PASSPHRASE');
+      if (!isValid) {
+        throw ApiError.forbidden('Invalid passphrase', 'INVALID_PASSPHRASE');
+      }
     }
   }
 
